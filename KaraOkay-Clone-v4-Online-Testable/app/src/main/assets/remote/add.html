@@ -1,0 +1,272 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#00301F">
+<title>Send to Kara-okay</title>
+<!--
+  Sends the user's own songs, sounds and background photos and videos to Kara-okay: to a TV that
+  has no file picker, or to a phone from a computer. Opened from the QR code on the app's send
+  screen, which carries the code in the link; typed by hand, the page asks for the code instead.
+  Served by the device over the local Wi-Fi, so it needs no internet and works on any phone or
+  computer, iPhone included.
+
+  Since 1.2 a whole folder can come in at once: chosen with "Choose a folder", or dragged onto the
+  page from a computer's file manager (Windows Explorer, Finder). Users found adding files one by
+  one, going back to the same folder each time, the most tedious part of the app.
+-->
+<style>
+  :root { --deep: #00301F; --green: #004435; --mint: #00C39A; --mint-light: #5FE0C2; --mist: #E4F3F2; --dim: #B9D6D2; --row: #14211C; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; background: var(--deep); color: var(--mist); font: 16px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif; }
+  body { min-height: 100vh; background: linear-gradient(160deg, #0A6B4E 0%, var(--green) 35%, var(--deep) 100%) fixed; }
+  main { max-width: 560px; margin: 0 auto; padding: max(16px, env(safe-area-inset-top)) 16px 40px; }
+  h1 { font-size: 22px; letter-spacing: .04em; margin: 0 0 4px; }
+  .lead { color: var(--dim); margin: 0 0 16px; }
+  .panel { background: rgba(0,0,0,.28); border: 1.5px solid rgba(228,243,242,.18); border-radius: 16px; padding: 16px; margin-bottom: 12px; }
+  .kicker { color: var(--mint-light); font-size: 12px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; margin-bottom: 6px; }
+  button, .pick { display: flex; align-items: center; justify-content: center; width: 100%; font: inherit; font-weight: 700; letter-spacing: .04em;
+    text-transform: uppercase; color: var(--deep); background: var(--mint); border: 0; border-radius: 12px; min-height: 58px; cursor: pointer; }
+  .pick.second { background: transparent; color: var(--mint-light); border: 1.5px solid var(--mint); margin-top: 10px; }
+  button:disabled { opacity: .4; }
+  input[type=file] { display: none; }
+  input.code { width: 100%; font: inherit; font-size: 28px; letter-spacing: .3em; text-align: center; color: var(--mist);
+    background: rgba(0,0,0,.25); border: 1.5px solid rgba(228,243,242,.3); border-radius: 12px; padding: 12px; margin-bottom: 10px; outline: none; }
+  input.code:focus { border-color: var(--mint-light); }
+  .drop { margin-top: 12px; border: 2px dashed rgba(228,243,242,.35); border-radius: 14px; padding: 22px 12px; text-align: center; color: var(--dim); }
+  .drop.over { border-color: var(--mint-light); color: var(--mist); background: rgba(0,195,154,.12); }
+  ul { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px; }
+  li { background: var(--row); border-radius: 10px; padding: 10px 12px; }
+  li .name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  li .msg { color: var(--dim); font-size: 14px; }
+  li.ok .msg { color: var(--mint-light); }
+  li.bad .msg { color: #ffb4b0; }
+  .bar { height: 6px; border-radius: 3px; background: rgba(228,243,242,.15); margin-top: 8px; overflow: hidden; }
+  .bar > i { display: block; height: 100%; width: 0; background: var(--mint); }
+  .note { color: var(--dim); font-size: 14px; margin: 10px 0 0; }
+  .summary { color: var(--mint-light); font-weight: 600; margin: 0 0 10px; min-height: 0; }
+  .error { color: #ffb4b0; font-size: 14px; min-height: 20px; margin-top: 6px; }
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+<main>
+  <h1>SEND TO KARA-OKAY</h1>
+  <p class="lead">Your own songs, sounds and background photos and videos.</p>
+
+  <section id="ask" class="panel hidden">
+    <div class="kicker">Code</div>
+    <p>Type the 6-digit code shown on the Kara-okay screen.</p>
+    <input class="code" id="code" inputmode="numeric" maxlength="6" autocomplete="off" placeholder="______">
+    <button id="useCode">Next</button>
+    <div class="error" id="codeError"></div>
+  </section>
+
+  <section id="send" class="hidden">
+    <div class="panel">
+      <label class="pick" for="files">Choose files</label>
+      <input type="file" id="files" multiple
+        accept=".mid,.midi,.kar,.rmi,.mp3,.lrc,.txt,.sf2,.jpg,.jpeg,.png,.webp,.mp4,.mkv,.webm,.3gp,.mov,.m4v,audio/*,image/*,video/*">
+      <label class="pick second hidden" id="folderPick" for="folder">Choose a folder</label>
+      <input type="file" id="folder" webkitdirectory multiple>
+      <div class="drop hidden" id="drop">Or drag files, or a whole folder, here</div>
+      <p class="note">MIDI, KAR or MP3 songs with their .lrc lyrics, karaoke videos (MP4) with the words in the picture, and .sf2 sounds.
+        Anything else in a folder is left out, and there is no limit on how many. Keep Kara-okay on the send screen until it says Done.</p>
+      <label class="pick second" for="bgfiles">Add backgrounds (photos and videos)</label>
+      <input type="file" id="bgfiles" multiple accept="image/*,video/*,.mp4,.mkv,.webm,.mov,.jpg,.jpeg,.png,.webp">
+      <p class="note">Karaoke videos you send above become songs. For a photo or a video to play behind the lyrics, use Add backgrounds.</p>
+    </div>
+    <p class="summary" id="summary"></p>
+    <ul id="list"></ul>
+  </section>
+</main>
+<script>
+(() => {
+  'use strict';
+  const $ = (id) => document.getElementById(id);
+  let code = new URLSearchParams(location.search).get('k') || '';
+  let busy = false;
+
+  function show() {
+    $('ask').classList.toggle('hidden', !!code);
+    $('send').classList.toggle('hidden', !code);
+  }
+
+  $('useCode').onclick = () => {
+    const typed = $('code').value.replace(/\D/g, '');
+    if (typed.length !== 6) { $('codeError').textContent = 'The code has 6 digits.'; return; }
+    code = typed;
+    $('codeError').textContent = '';
+    show();
+  };
+
+  // The same sorting as the app's FolderImport: what each file is, by its name, else its type.
+  const KINDS = { song: 0, sound: 1, lyrics: 2, photo: 3, video: 4 };
+  function kindOf(file) {
+    const name = file.name || '';
+    if (name.startsWith('.')) return null;
+    const ext = (name.match(/\.([^.]+)$/) || [])[1];
+    const e = ext ? ext.toLowerCase() : '';
+    if (['mid', 'midi', 'kar', 'rmi', 'mp3'].includes(e)) return 'song';
+    if (e === 'lrc') return 'lyrics';
+    if (e === 'txt') return 'words';
+    if (e === 'sf2') return 'sound';
+    if (['jpg', 'jpeg', 'png', 'webp'].includes(e)) return 'photo';
+    if (['mp4', 'mkv', 'webm', '3gp', 'mov', 'm4v'].includes(e)) return 'video';
+    const type = file.type || '';
+    if (type.startsWith('image/') && !type.includes('gif')) return 'photo';
+    if (type.startsWith('video/')) return 'video';
+    if (type === 'audio/midi' || type === 'audio/mpeg') return 'song';
+    return null;
+  }
+
+  // A video counts as a karaoke song, unless it sits in a background folder ("bgv",
+  // "Backgrounds"): SongHub keeps its background videos in "bgv".
+  const BG_DIRS = ['backgrounds', 'background', 'bg', 'bgv', 'bgvideo', 'bgvideos', 'bgphoto', 'bgphotos', 'background videos'];
+  const inBackgroundDir = (f) => pathOf(f).toLowerCase().split('/').slice(0, -1).some((d) => BG_DIRS.includes(d));
+  const pathOf = (f) => (f.webkitRelativePath || f._path || f.name || '').replace(/^\/+/, '');
+
+  // Songs first, then sounds, then lyrics -- so an MP3 is in before the .lrc that belongs to it --
+  // then the backgrounds. Three at a time: one copying on the device while the next upload, so
+  // a folder of thousands comes in at a steady pace.
+  async function sendAll(files, asBackground) {
+    if (busy || !files.length) return;
+    busy = true;
+    // A .txt is lyrics only beside an MP3 of the same name; any other text file is left out.
+    const base = (f) => (f.name || '').replace(/\.[^.]+$/, '').toLowerCase();
+    const mp3s = new Set(files.filter((f) => /\.mp3$/i.test(f.name || '')).map(base));
+    const kept = files.map((f) => [kindOf(f), f])
+      .map(([k, f]) => [k === 'words' ? (mp3s.has(base(f)) ? 'lyrics' : null) : k, f])
+      .filter(([k]) => k);
+    const left = files.length - kept.length;
+    kept.sort((a, b) => KINDS[a[0]] - KINDS[b[0]]);
+    let added = 0, failed = 0;
+    $('summary').textContent = kept.length ? 'Sending ' + kept.length + (kept.length === 1 ? ' file…' : ' files…') : '';
+    // In phases, so every MP3 is in before any .lrc that pairs with it.
+    const phases = [['song', 'sound'], ['lyrics'], ['photo', 'video']];
+    for (const phase of phases) {
+      const batch = kept.filter(([k]) => phase.includes(k));
+      let next = 0;
+      const worker = async () => {
+        while (code && next < batch.length) {
+          const [kind, file] = batch[next++];
+          const bg = asBackground || kind === 'photo' || (kind === 'video' && inBackgroundDir(file));
+          const ok = await send(file, bg);
+          if (ok) added++; else failed++;
+          $('summary').textContent = 'Sending… ' + (added + failed) + ' of ' + kept.length;
+        }
+      };
+      await Promise.all([worker(), worker(), worker()]);
+    }
+    const parts = [];
+    parts.push(added + (added === 1 ? ' file added' : ' files added'));
+    if (failed) parts.push(failed + ' not added');
+    if (left) parts.push(left + (left === 1 ? ' other file left out' : ' other files left out'));
+    $('summary').textContent = 'Done: ' + parts.join(', ') + '.';
+    busy = false;
+  }
+
+  $('files').onchange = (e) => { const files = Array.from(e.target.files || []); e.target.value = ''; sendAll(files, false); };
+  $('folder').onchange = (e) => { const files = Array.from(e.target.files || []); e.target.value = ''; sendAll(files, false); };
+  $('bgfiles').onchange = (e) => { const files = Array.from(e.target.files || []); e.target.value = ''; sendAll(files, true); };
+
+  // A folder can be chosen where the browser can do it; phones mostly can't, computers can.
+  const canFolder = 'webkitdirectory' in document.createElement('input') && !/Android|iPhone|iPad/i.test(navigator.userAgent);
+  $('folderPick').classList.toggle('hidden', !canFolder);
+  $('drop').classList.toggle('hidden', !canFolder);
+
+  // Dragging from a file manager: folders are walked, files inside folders inside folders too.
+  function readAll(reader) {
+    return new Promise((resolve) => {
+      const out = [];
+      const next = () => reader.readEntries((batch) => {
+        if (!batch.length) { resolve(out); return; }
+        out.push(...batch);
+        next();
+      }, () => resolve(out));
+      next();
+    });
+  }
+  async function filesOf(entry, depth) {
+    if (!entry || depth > 8) return [];
+    if (entry.isFile) return new Promise((resolve) => entry.file((f) => { f._path = entry.fullPath; resolve([f]); }, () => resolve([])));
+    if (entry.isDirectory) {
+      if (entry.name.startsWith('.')) return [];
+      const children = await readAll(entry.createReader());
+      const lists = [];
+      for (const child of children) lists.push(await filesOf(child, depth + 1));
+      return lists.flat();
+    }
+    return [];
+  }
+  const drop = $('drop');
+  ['dragenter', 'dragover'].forEach((t) => document.addEventListener(t, (e) => { e.preventDefault(); drop.classList.add('over'); }));
+  ['dragleave', 'dragend'].forEach((t) => document.addEventListener(t, (e) => { if (e.target === document || e.target === drop) drop.classList.remove('over'); }));
+  document.addEventListener('drop', async (e) => {
+    e.preventDefault();
+    drop.classList.remove('over');
+    if (!code) return;
+    const items = Array.from(e.dataTransfer.items || []);
+    const entries = items.map((i) => i.webkitGetAsEntry && i.webkitGetAsEntry()).filter(Boolean);
+    let files;
+    if (entries.length) {
+      $('summary').textContent = 'Looking in the folder…';
+      files = (await Promise.all(entries.map((en) => filesOf(en, 0)))).flat();
+    } else {
+      files = Array.from(e.dataTransfer.files || []);
+    }
+    sendAll(files, false);
+  });
+
+  function row(file) {
+    const li = document.createElement('li');
+    li.innerHTML = '<div class="name"></div><div class="msg">Waiting…</div><div class="bar"><i></i></div>';
+    li.querySelector('.name').textContent = pathOf(file);
+    const list = $('list');
+    list.prepend(li);
+    // The last hundred only: a page listing thousands of rows slows the phone sending them.
+    while (list.children.length > 100) list.lastElementChild.remove();
+    return li;
+  }
+
+  function send(file, asBackground) {
+    const li = row(file);
+    const msg = li.querySelector('.msg');
+    const bar = li.querySelector('.bar > i');
+    return new Promise((resolve) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', '/api/upload?k=' + encodeURIComponent(code) + '&name=' + encodeURIComponent(file.name) +
+        '&path=' + encodeURIComponent(pathOf(file)) + (asBackground ? '&as=bg' : ''));
+
+      xhr.setRequestHeader('Content-Type', 'application/octet-stream');
+      xhr.upload.onprogress = (ev) => {
+        if (!ev.lengthComputable) return;
+        const pct = ev.loaded / ev.total * 100;
+        bar.style.width = pct.toFixed(1) + '%';
+        msg.textContent = pct < 100 ? 'Sending… ' + Math.floor(pct) + '%' : 'Adding…';
+      };
+      xhr.onload = () => {
+        let reply = {};
+        try { reply = JSON.parse(xhr.responseText); } catch (_) {}
+        const ok = xhr.status === 200 && reply.ok;
+        li.className = ok ? 'ok' : 'bad';
+        bar.style.width = '100%';
+        msg.textContent = reply.message || reply.error || ('Kara-okay answered ' + xhr.status + '.');
+        if (xhr.status === 403) { code = ''; $('codeError').textContent = reply.error || 'The code is wrong.'; show(); }
+        resolve(ok);
+      };
+      xhr.onerror = () => {
+        li.className = 'bad';
+        msg.textContent = 'Could not reach Kara-okay. Is it still on the send screen, on the same Wi-Fi?';
+        resolve(false);
+      };
+      xhr.send(file);
+    });
+  }
+
+  show();
+})();
+</script>
+</body>
+</html>
